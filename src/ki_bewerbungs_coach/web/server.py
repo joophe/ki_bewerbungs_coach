@@ -119,8 +119,9 @@ def _child_environment(session_dir: Path, rows: int, cols: int) -> dict[str, str
             "COLUMNS": str(cols),
             "LINES": str(rows),
             "PYTHONUNBUFFERED": "1",
-            # Ergebnisdatei bleibt in der ephemeren Sitzung; nichts wird persistiert.
-            "OUTPUT_FILE": "bewerbung_output.md",
+            # Keine Ergebnisdatei in der Web-Version: Antworten stehen im Verlauf,
+            # die Sitzung ist ephemer.
+            "WRITE_OUTPUT_FILE": "0",
             # `.env` im Sitzungsverzeichnis vermeiden: Konfiguration kommt aus echten Env-Vars.
         }
     )
@@ -154,9 +155,22 @@ async def terminal_ws(websocket: WebSocket) -> None:
         await websocket.close()
         return
 
+    # Auf die erste Fenstergröße des Clients warten, BEVOR der Coach startet.
+    # Sonst rendert er (v. a. auf Phone/Tablet) mit der Default-Breite, und die
+    # bereits gedruckten Rahmen verschachteln sich beim Umbruch im Browser.
+    init_rows, init_cols = DEFAULT_ROWS, DEFAULT_COLS
+    try:
+        first_raw = await asyncio.wait_for(websocket.receive_text(), timeout=3.0)
+        first = json.loads(first_raw)
+        if first.get("type") == "resize":
+            init_rows = int(first.get("rows", DEFAULT_ROWS))
+            init_cols = int(first.get("cols", DEFAULT_COLS))
+    except (asyncio.TimeoutError, WebSocketDisconnect, ValueError, TypeError, RuntimeError):
+        pass
+
     session_dir = Path(tempfile.mkdtemp(prefix="coach-session-"))
     master_fd, slave_fd = pty.openpty()
-    _set_winsize(master_fd, DEFAULT_ROWS, DEFAULT_COLS)
+    _set_winsize(master_fd, init_rows, init_cols)
 
     proc = await asyncio.create_subprocess_exec(
         sys.executable,
@@ -167,7 +181,7 @@ async def terminal_ws(websocket: WebSocket) -> None:
         stderr=slave_fd,
         start_new_session=True,
         cwd=str(session_dir),
-        env=_child_environment(session_dir, DEFAULT_ROWS, DEFAULT_COLS),
+        env=_child_environment(session_dir, init_rows, init_cols),
     )
     os.close(slave_fd)
 

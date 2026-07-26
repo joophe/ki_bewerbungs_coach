@@ -56,11 +56,22 @@ FACES = {
 }
 
 
+# Unterhalb dieser Terminalbreite wird kompakter gerendert (schmale Browser,
+# Tablet, Smartphone): weniger Padding, keine Avatar-Seitenspalte. Sonst passen
+# Rahmen und Text nicht mehr in die verfügbaren Spalten und verschachteln sich.
+NARROW_WIDTH = 64
+
+
 class TerminalUI:
     """Eine konsistente Oberfläche trennt Coach-Dialog, Dokumente und Systemzustände."""
 
     def __init__(self, console: Console | None = None) -> None:
         self.console = console or Console(theme=THEME, highlight=False)
+
+    @property
+    def _is_narrow(self) -> bool:
+        """Wird pro Ausgabe geprüft, damit sich die Darstellung an die aktuelle Breite anpasst."""
+        return self.console.width < NARROW_WIDTH
 
     def _avatar(self, face: str) -> Text:
         """Ein gemeinsamer Renderer verhindert, dass Startansicht und Dialog optisch auseinanderlaufen."""
@@ -95,8 +106,10 @@ class TerminalUI:
         body.add_row(Text("5 Unterlagenabgleich · 6 Finale Antworten", style="muted"))
         body.add_row("")
         body.add_row(Text(f"Modell: {settings.model}", style="muted"))
-        body.add_row(Text(f"Ausgabe: {settings.output_file}", style="muted"))
-        self.console.print(Panel(body, border_style=BRAND_BLUE, padding=(1, 2)))
+        if settings.write_output_file:
+            body.add_row(Text(f"Ausgabe: {settings.output_file}", style="muted"))
+        padding = (0, 1) if self._is_narrow else (1, 2)
+        self.console.print(Panel(body, border_style=BRAND_BLUE, padding=padding))
 
     def phase_header(self, number: int) -> None:
         """Sichtbarer Fortschritt verhindert, dass ein längeres Interview wie ein offener Chat wirkt."""
@@ -117,7 +130,6 @@ class TerminalUI:
         subtitle: str = "KI Bewerbungs Coach",
     ) -> None:
         """Alle dialogischen Inhalte bleiben beim Coach, damit Artefakte nicht wie spontane Aussagen wirken."""
-        avatar = self._avatar(face)
         body = Panel(
             Markdown(message),
             title=f"[brand.gold]{subtitle}[/brand.gold]",
@@ -125,6 +137,12 @@ class TerminalUI:
             padding=(0, 1),
             expand=True,
         )
+        if self._is_narrow:
+            # Auf schmalen Terminals keine Avatar-Seitenspalte: das Panel nutzt
+            # die volle Breite, statt sich mit dem Avatar zu verschachteln.
+            self.console.print(body)
+            return
+        avatar = self._avatar(face)
         layout = Table.grid(padding=(0, 1))
         layout.add_column(width=7, vertical="top")
         layout.add_column(ratio=1)
@@ -133,12 +151,13 @@ class TerminalUI:
 
     def show_document(self, title: str, content: str) -> None:
         """Generierte Ergebnisse erhalten eine eigene visuelle Rolle und sind leichter prüfbar."""
+        padding = (0, 1) if self._is_narrow else (1, 2)
         self.console.print(
             Panel(
                 Markdown(content),
                 title=f"[brand.blue]{title}[/brand.blue]",
                 border_style=ACCENT_GOLD,
-                padding=(1, 2),
+                padding=padding,
             )
         )
 

@@ -16,6 +16,7 @@ def _settings(**overrides: object) -> Settings:
         empty_retries=0,
         retry_delay_seconds=0.0,
         timeout_seconds=1.0,
+        write_output_file=False,
     )
     base.update(overrides)
     return Settings(**base)  # type: ignore[arg-type]

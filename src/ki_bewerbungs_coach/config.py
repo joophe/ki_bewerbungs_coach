@@ -19,6 +19,7 @@ class Settings:
     empty_retries: int
     retry_delay_seconds: float
     timeout_seconds: float
+    write_output_file: bool
 
     @classmethod
     def from_environment(cls, base_dir: Path | None = None) -> "Settings":
@@ -33,6 +34,9 @@ class Settings:
             # Begrenzt die Wartezeit pro Modellaufruf, damit ein träges/hängendes
             # (z. B. kostenloses) Modell den Coach nicht endlos blockiert.
             timeout_seconds=max(5.0, _read_float("LLM_TIMEOUT_SECONDS", 90.0)),
+            # Die Web-Version deaktiviert das Schreiben der Ergebnisdatei: die
+            # Antworten stehen bereits im Terminal-Verlauf und die Sitzung ist ephemer.
+            write_output_file=_read_bool("WRITE_OUTPUT_FILE", True),
         )
 
 
@@ -45,6 +49,13 @@ def load_local_environment(base_dir: Path | None = None) -> Path | None:
             load_dotenv(candidate, override=False)
             return candidate
     return None
+
+
+def _read_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() not in {"0", "false", "no", "off", ""}
 
 
 def _read_int(name: str, default: int) -> int:
