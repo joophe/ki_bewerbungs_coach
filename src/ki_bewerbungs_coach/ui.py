@@ -16,11 +16,12 @@ from rich.theme import Theme
 
 from .config import Settings
 
-BRAND_BLUE = "#174EA6"
+# Farben sind für einen dunklen Terminalhintergrund abgestimmt (Web-Demo & übliche Terminals).
+BRAND_BLUE = "#5B9BFF"
 ACCENT_GOLD = "#F4B400"
-ALERT_RED = "#C5221F"
-TEXT_INK = "#1F2937"
-TEXT_MUTED = "#6B7280"
+ALERT_RED = "#FF6B6B"
+TEXT_INK = "#E5E7EB"
+TEXT_MUTED = "#9CA3AF"
 
 THEME = Theme(
     {
@@ -43,11 +44,15 @@ PHASES = (
     "Finale Antworten",
 )
 
+# Die Web-Demo liefert einen Monospace-Font (DejaVu Sans Mono) mit, der diese
+# Glyphen exakt einzellig enthält – dadurch bleibt die Rahmen-Box browser-
+# unabhängig sauber ausgerichtet. Im lokalen Terminal hängt die Darstellung vom
+# installierten Font ab (die meisten gängigen Monospace-Fonts enthalten sie).
 FACES = {
     "friendly": "◕‿◕",
     "curious": "◔‿◔",
     "thinking": "◑‿◑",
-    "critical": "◕︵◕",
+    "critical": "◕◠◕",
 }
 
 

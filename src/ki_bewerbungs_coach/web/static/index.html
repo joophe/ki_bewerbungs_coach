@@ -2,16 +2,27 @@
 <html lang="de">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
     <title>KI Bewerbungs Coach – Live-Demo</title>
     <link
       rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css"
     />
     <style>
+      /* Mitgelieferter Monospace-Font (DejaVu Sans Mono, freie Lizenz).
+         Enthält die Maskottchen-Glyphen (◕ ‿) als exakt einzellige Zeichen,
+         daher rendert das Terminal in jedem Browser identisch und ausgerichtet. */
+      @font-face {
+        font-family: "CoachMono";
+        src: url("/static/DejaVuSansMono.ttf") format("truetype");
+        font-display: swap;
+      }
       :root {
-        --bg: #0f172a;
-        --bar: #111c34;
+        --bg: #000000;
+        --bar: #0d0d0d;
         --ink: #e2e8f0;
         --muted: #94a3b8;
         --accent: #f4b400;
@@ -19,40 +30,113 @@
       * { box-sizing: border-box; }
       html, body {
         margin: 0;
-        height: 100%;
+        height: 100vh;
+        height: 100dvh;
+        overflow: hidden;
         background: var(--bg);
         color: var(--ink);
         font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
       }
       body { display: flex; flex-direction: column; }
       header {
+        flex: 0 0 auto;
         display: flex;
         align-items: center;
         gap: 0.75rem;
         padding: 0.6rem 1rem;
         background: var(--bar);
-        border-bottom: 1px solid #1e293b;
+        border-bottom: 1px solid #1a1a1a;
         font-size: 0.9rem;
       }
       header .title { font-weight: 600; }
       header .title b { color: var(--accent); }
       header .hint { color: var(--muted); margin-left: auto; }
+      #status.disconnected { color: #f87171; }
+
+      /* Prominenter KI-Transparenzhinweis, direkt unter dem Header. */
+      .notice {
+        flex: 0 0 auto;
+        display: flex;
+        align-items: flex-start;
+        gap: 0.6rem;
+        padding: 0.75rem 1rem;
+        background: #1c1607;
+        border-left: 4px solid var(--accent);
+        color: #fde9c0;
+        font-size: 0.92rem;
+        line-height: 1.45;
+      }
+      .notice .icon {
+        flex: 0 0 auto;
+        font-weight: 700;
+        color: var(--accent);
+        font-size: 1.05rem;
+        line-height: 1.3;
+      }
+      .notice b { color: #ffd97a; }
+
       #terminal {
-        flex: 1;
+        flex: 1 1 auto;
         min-height: 0;
         padding: 0.5rem;
+        background: var(--bg);
       }
-      footer {
-        padding: 0.4rem 1rem;
+
+      /* Eingabeleiste unten – zuverlässige Texteingabe (v. a. mobil). */
+      .inputbar {
+        flex: 0 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+        padding: 0.5rem 0.6rem calc(0.5rem + env(safe-area-inset-bottom));
         background: var(--bar);
-        border-top: 1px solid #1e293b;
-        color: var(--muted);
-        font-size: 0.75rem;
-        line-height: 1.4;
+        border-top: 1px solid #1a1a1a;
       }
-      #status.disconnected { color: #f87171; }
+      .inputbar .chips { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+      .inputbar .chips button {
+        background: #1a1a1a;
+        color: var(--muted);
+        border: 1px solid #2a2a2a;
+        border-radius: 999px;
+        padding: 0.15rem 0.7rem;
+        font-size: 0.8rem;
+        cursor: pointer;
+      }
+      .inputbar .chips button:active { background: #2a2a2a; color: var(--ink); }
+      .inputbar .row { display: flex; gap: 0.5rem; align-items: flex-end; }
+      .inputbar textarea {
+        flex: 1 1 auto;
+        resize: none;
+        min-height: 2.5rem;
+        max-height: 8rem;
+        padding: 0.55rem 0.7rem;
+        border-radius: 8px;
+        border: 1px solid #2a2a2a;
+        background: #0d0d0d;
+        color: var(--ink);
+        font-family: inherit;
+        /* 16px verhindert das automatische Zoomen auf iOS beim Fokus. */
+        font-size: 16px;
+        line-height: 1.35;
+      }
+      .inputbar textarea:focus { outline: none; border-color: var(--accent); }
+      .inputbar #send {
+        flex: 0 0 auto;
+        background: var(--accent);
+        color: #111;
+        font-weight: 600;
+        border: none;
+        border-radius: 8px;
+        padding: 0.65rem 1.1rem;
+        font-size: 0.95rem;
+        cursor: pointer;
+      }
+      .inputbar #send:active { filter: brightness(0.9); }
+
       @media (max-width: 640px) {
+        header { font-size: 0.82rem; }
         header .hint { display: none; }
+        .notice { font-size: 0.82rem; padding: 0.6rem 0.7rem; }
       }
     </style>
   </head>
@@ -61,87 +145,184 @@
       <span class="title"><b>KI Bewerbungs Coach</b> · Live-Demo im Browser</span>
       <span class="hint" id="status">verbinde …</span>
     </header>
+
+    <div class="notice">
+      <span class="icon">&#9432;</span>
+      <span>
+        Du interagierst hier mit einem <b>KI-System</b>. Bitte gib
+        <b>keine vertraulichen oder unnötigen personenbezogenen Daten</b> ein –
+        Eingaben werden zur Textgenerierung an einen externen Modellanbieter
+        übermittelt. Die Demo ist zustandslos: Nach dem Schließen des Tabs
+        bleibt nichts gespeichert.
+      </span>
+    </div>
+
     <div id="terminal"></div>
-    <footer>
-      Du interagierst hier mit einem KI-System. Gib keine vertraulichen oder
-      unnötigen personenbezogenen Daten ein – Eingaben werden zur Textgenerierung
-      an einen externen Modellanbieter übermittelt. Die Demo ist zustandslos:
-      nach dem Schließen des Tabs bleibt nichts gespeichert.
-    </footer>
+
+    <form class="inputbar" id="inputbar" autocomplete="off">
+      <div class="chips">
+        <button type="button" data-token="DONE">DONE</button>
+        <button type="button" data-token="SKIP">SKIP</button>
+        <button type="button" data-token="STOP">STOP</button>
+      </div>
+      <div class="row">
+        <textarea
+          id="input"
+          rows="1"
+          placeholder="Antwort eingeben … (mehrzeilig möglich, dann „Senden“)"
+          autocapitalize="sentences"
+        ></textarea>
+        <button type="submit" id="send">Senden</button>
+      </div>
+    </form>
 
     <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
     <script>
-      const term = new Terminal({
-        cursorBlink: true,
-        fontSize: 14,
-        fontFamily:
-          "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace",
-        theme: { background: "#0f172a", foreground: "#e2e8f0" },
-        convertEol: false,
-        scrollback: 5000,
-      });
-      const fit = new FitAddon.FitAddon();
-      term.loadAddon(fit);
-      term.open(document.getElementById("terminal"));
-      fit.fit();
-
+      const FONT_FAMILY =
+        "CoachMono, ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace";
       const statusEl = document.getElementById("status");
-      const wsScheme = location.protocol === "https:" ? "wss" : "ws";
-      const ws = new WebSocket(`${wsScheme}://${location.host}/ws`);
-      ws.binaryType = "arraybuffer";
-      const decoder = new TextDecoder();
+      const inputEl = document.getElementById("input");
+      const sendBtn = document.getElementById("send");
+      const formEl = document.getElementById("inputbar");
+      const isMobile = window.matchMedia("(max-width: 640px)").matches;
 
-      function sendResize() {
-        if (ws.readyState !== WebSocket.OPEN) return;
-        ws.send(
-          JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows })
-        );
+      function startTerminal() {
+        const term = new Terminal({
+          cursorBlink: true,
+          fontSize: isMobile ? 12 : 14,
+          fontFamily: FONT_FAMILY,
+          theme: { background: "#000000", foreground: "#e2e8f0" },
+          convertEol: false,
+          scrollback: 5000,
+        });
+        const fit = new FitAddon.FitAddon();
+        term.loadAddon(fit);
+        term.open(document.getElementById("terminal"));
+        const doFit = () => {
+          try { fit.fit(); } catch (e) {}
+        };
+        doFit();
+
+        const wsScheme = location.protocol === "https:" ? "wss" : "ws";
+        const ws = new WebSocket(`${wsScheme}://${location.host}/ws`);
+        ws.binaryType = "arraybuffer";
+
+        function sendResize() {
+          if (ws.readyState !== WebSocket.OPEN) return;
+          ws.send(
+            JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows })
+          );
+        }
+
+        // Text an die interaktive CLI schicken (mit Zeilenumbruch = Absenden).
+        function sendStdin(text) {
+          if (ws.readyState !== WebSocket.OPEN || !text) return;
+          ws.send(JSON.stringify({ type: "stdin", data: text }));
+        }
+
+        ws.onopen = () => {
+          statusEl.textContent = "verbunden";
+          statusEl.className = "";
+          doFit();
+          sendResize();
+        };
+
+        ws.onmessage = (event) => {
+          if (event.data instanceof ArrayBuffer) {
+            term.write(new Uint8Array(event.data));
+          } else {
+            term.write(String(event.data));
+          }
+        };
+
+        ws.onclose = () => {
+          statusEl.textContent = "getrennt";
+          statusEl.className = "disconnected";
+          term.write(
+            "\r\n\x1b[90m— Verbindung beendet. Seite neu laden, um erneut zu starten. —\x1b[0m\r\n"
+          );
+        };
+
+        ws.onerror = () => {
+          statusEl.textContent = "Verbindungsfehler";
+          statusEl.className = "disconnected";
+        };
+
+        // Desktop: direkt im Terminal tippen bleibt möglich.
+        term.onData((data) => sendStdin(data));
+
+        // --- Eingabeleiste (mobil-tauglich) --------------------------------
+        function submitInput() {
+          const text = inputEl.value;
+          if (text.trim() === "" && text.indexOf("\n") === -1) {
+            // Leeres Feld: eine leere Zeile (z. B. um input() zu bestätigen).
+            sendStdin("\n");
+          } else {
+            sendStdin(text + "\n");
+          }
+          inputEl.value = "";
+          autoGrow();
+          inputEl.focus();
+          term.scrollToBottom();
+        }
+
+        formEl.addEventListener("submit", (e) => {
+          e.preventDefault();
+          submitInput();
+        });
+
+        // Ctrl/Cmd+Enter sendet ebenfalls; Enter allein erzeugt eine neue Zeile
+        // (wichtig, damit man vor „DONE“ noch Zeilen einfügen kann).
+        inputEl.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            submitInput();
+          }
+        });
+
+        // Schnell-Buttons für die Steuertoken.
+        document.querySelectorAll(".chips button").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            sendStdin(btn.dataset.token + "\n");
+            term.scrollToBottom();
+            inputEl.focus();
+          });
+        });
+
+        // Textarea automatisch mitwachsen lassen.
+        function autoGrow() {
+          inputEl.style.height = "auto";
+          inputEl.style.height = Math.min(inputEl.scrollHeight, 128) + "px";
+        }
+        inputEl.addEventListener("input", autoGrow);
+
+        // Auf Größenänderungen (inkl. eingeblendeter Tastatur) neu einpassen.
+        let resizeTimer = null;
+        function scheduleFit() {
+          clearTimeout(resizeTimer);
+          resizeTimer = setTimeout(() => {
+            doFit();
+            sendResize();
+          }, 120);
+        }
+        window.addEventListener("resize", scheduleFit);
+        if (window.visualViewport) {
+          window.visualViewport.addEventListener("resize", scheduleFit);
+        }
       }
 
-      ws.onopen = () => {
-        statusEl.textContent = "verbunden";
-        statusEl.className = "";
-        fit.fit();
-        sendResize();
-        term.focus();
-      };
-
-      ws.onmessage = (event) => {
-        if (event.data instanceof ArrayBuffer) {
-          term.write(new Uint8Array(event.data));
-        } else {
-          term.write(String(event.data));
-        }
-      };
-
-      ws.onclose = () => {
-        statusEl.textContent = "getrennt";
-        statusEl.className = "disconnected";
-        term.write(
-          "\r\n\x1b[90m— Verbindung beendet. Seite neu laden, um erneut zu starten. —\x1b[0m\r\n"
-        );
-      };
-
-      ws.onerror = () => {
-        statusEl.textContent = "Verbindungsfehler";
-        statusEl.className = "disconnected";
-      };
-
-      term.onData((data) => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: "stdin", data }));
-        }
-      });
-
-      let resizeTimer = null;
-      window.addEventListener("resize", () => {
-        clearTimeout(resizeTimer);
-        resizeTimer = setTimeout(() => {
-          fit.fit();
-          sendResize();
-        }, 120);
-      });
+      // Terminal erst starten, wenn der Font geladen ist – sonst misst xterm
+      // die Zeichenbreite eines Fallback-Fonts und das Layout verrutscht.
+      if (document.fonts && document.fonts.load) {
+        document.fonts
+          .load('14px "CoachMono"')
+          .then(() => document.fonts.ready)
+          .then(startTerminal)
+          .catch(startTerminal);
+      } else {
+        startTerminal();
+      }
     </script>
   </body>
 </html>

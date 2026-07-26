@@ -3,9 +3,9 @@
 Ein interaktives Python-Tool, das konkrete berufliche Erfahrungen in ein validiertes Arbeitsstil-Profil und anschließend in authentische Bewerbungsantworten überführt.
 
 ```text
-╭─────╮
+╭───╮
 │◕‿◕│
-╰──┬──╯
+╰─┬─╯
 
 KI Bewerbungs Coach
 
@@ -230,6 +230,11 @@ Lokaler Schnellstart (Linux/macOS; unter Windows via Docker):
 pip install -e ".[web]"
 ki-bewerbungs-coach-web         # http://localhost:8000
 ```
+
+Die Seite ist responsiv und auch mobil bedienbar: Auf dem Smartphone gibt es
+unter dem Terminal eine eigene Eingabeleiste (Textfeld + „Senden" sowie
+Schnell-Buttons für `DONE`/`SKIP`/`STOP`), damit die Eingabe nicht von der
+unzuverlässigen Terminal-Tastatur mobiler Browser abhängt.
 
 Für das Deployment auf einem VPS mit eigener Domain und automatischem HTTPS
 (Docker + Caddy + kostenloses OpenRouter-Modell) siehe **[DEPLOY.md](DEPLOY.md)**.

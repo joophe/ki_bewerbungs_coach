@@ -27,6 +27,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, WebSocket
 from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.websockets import WebSocketDisconnect
 
 # PTY-Bausteine sind Unix-only. Import bewusst hier, damit ein Import des
@@ -65,6 +66,10 @@ DEFAULT_ROWS = max(10, _int_env("WEB_DEFAULT_ROWS", 32))
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 app = FastAPI(title="KI Bewerbungs Coach – Web")
+
+# Statische Assets (u. a. der mitgelieferte Monospace-Font für ein
+# browserunabhängiges Rendering des Maskottchens).
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
 # --------------------------------------------------------------------------- #

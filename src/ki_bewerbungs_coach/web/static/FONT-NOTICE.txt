@@ -1,0 +1,15 @@
+Mitgelieferte Schriftart
+========================
+
+Datei:   DejaVuSansMono.ttf
+Familie: DejaVu Sans Mono (Variante "for Powerline")
+Zweck:   Browserunabhängiges, exakt ausgerichtetes Rendering des Terminals
+         (enthält u. a. die Maskottchen-Glyphen als einzellige Zeichen).
+
+Lizenz:  DejaVu Fonts License (frei, permissiv; basiert auf der Bitstream
+         Vera Fonts License). Verwendung, Weitergabe und Bündelung sind
+         erlaubt. Volltext und Details:
+         https://dejavu-fonts.github.io/License.html
+
+Die DejaVu-Schriften sind ein Public-Domain-naher Fork der Bitstream-Vera-
+Schriften und werden hier unverändert zur Darstellung im Browser ausgeliefert.
