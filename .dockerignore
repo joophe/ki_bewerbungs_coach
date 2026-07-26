@@ -1,0 +1,24 @@
+# Secrets niemals ins Image
+.env
+
+# Git & lokale Umgebung
+.git
+.gitignore
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+
+# Build-Artefakte
+build/
+dist/
+*.egg-info/
+
+# Laufzeit-/Ausgabedateien
+bewerbung_output.md
+
+# Deployment-Dateien, die nicht ins App-Image gehören
+docker-compose.yml
+Caddyfile
+DEPLOY.md

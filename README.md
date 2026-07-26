@@ -217,6 +217,25 @@ Einige Provider oder kompatible Gateways liefern gelegentlich eine technisch erf
 
 Diese Logik wurde bewusst in `llm.py` und `workflow.py` getrennt: Der Provider erkennt die leere Antwort; der Workflow entscheidet, welcher fachliche Fallback sinnvoll ist.
 
+## Web-Demo / Hosting
+
+Der Coach kann zusätzlich als **Browser-Terminal** gehostet werden: Ein
+schlanker FastAPI-Server startet die bestehende CLI pro Browser-Sitzung in einer
+Pseudo-TTY und verbindet sie über WebSocket mit xterm.js. Die interaktive
+`rich`-Oberfläche bleibt dabei unverändert.
+
+Lokaler Schnellstart (Linux/macOS; unter Windows via Docker):
+
+```bash
+pip install -e ".[web]"
+ki-bewerbungs-coach-web         # http://localhost:8000
+```
+
+Für das Deployment auf einem VPS mit eigener Domain und automatischem HTTPS
+(Docker + Caddy + kostenloses OpenRouter-Modell) siehe **[DEPLOY.md](DEPLOY.md)**.
+
+> Die PTY-Bridge ist Unix-only. Auf Windows läuft die Web-Demo nur im Container.
+
 ## Tests
 
 ```bash

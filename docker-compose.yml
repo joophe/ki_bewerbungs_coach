@@ -1,0 +1,42 @@
+# KI Bewerbungs Coach – Web-Demo
+#
+# Zwei Dienste:
+#   app   – die Coach-Web-Anwendung (FastAPI + PTY), nur intern erreichbar
+#   caddy – Reverse-Proxy mit automatischem HTTPS (Let's Encrypt) für die Domain
+#
+# Start:  docker compose up -d --build
+# Voraussetzung: eine ausgefüllte .env (siehe .env.example) und die Ports 80/443.
+
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    expose:
+      - "8000"
+    # Ephemere Sitzungsverzeichnisse liegen unter /tmp.
+    tmpfs:
+      - /tmp
+    # Zusätzliche Härtung: keine neuen Privilegien.
+    security_opt:
+      - no-new-privileges:true
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # Domain (oder ":80" für lokalen Test ohne TLS) – kommt aus der .env.
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

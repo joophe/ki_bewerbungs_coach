@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>KI Bewerbungs Coach – Live-Demo</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css"
+    />
+    <style>
+      :root {
+        --bg: #0f172a;
+        --bar: #111c34;
+        --ink: #e2e8f0;
+        --muted: #94a3b8;
+        --accent: #f4b400;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        height: 100%;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      }
+      body { display: flex; flex-direction: column; }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.6rem 1rem;
+        background: var(--bar);
+        border-bottom: 1px solid #1e293b;
+        font-size: 0.9rem;
+      }
+      header .title { font-weight: 600; }
+      header .title b { color: var(--accent); }
+      header .hint { color: var(--muted); margin-left: auto; }
+      #terminal {
+        flex: 1;
+        min-height: 0;
+        padding: 0.5rem;
+      }
+      footer {
+        padding: 0.4rem 1rem;
+        background: var(--bar);
+        border-top: 1px solid #1e293b;
+        color: var(--muted);
+        font-size: 0.75rem;
+        line-height: 1.4;
+      }
+      #status.disconnected { color: #f87171; }
+      @media (max-width: 640px) {
+        header .hint { display: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <span class="title"><b>KI Bewerbungs Coach</b> · Live-Demo im Browser</span>
+      <span class="hint" id="status">verbinde …</span>
+    </header>
+    <div id="terminal"></div>
+    <footer>
+      Du interagierst hier mit einem KI-System. Gib keine vertraulichen oder
+      unnötigen personenbezogenen Daten ein – Eingaben werden zur Textgenerierung
+      an einen externen Modellanbieter übermittelt. Die Demo ist zustandslos:
+      nach dem Schließen des Tabs bleibt nichts gespeichert.
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+    <script>
+      const term = new Terminal({
+        cursorBlink: true,
+        fontSize: 14,
+        fontFamily:
+          "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace",
+        theme: { background: "#0f172a", foreground: "#e2e8f0" },
+        convertEol: false,
+        scrollback: 5000,
+      });
+      const fit = new FitAddon.FitAddon();
+      term.loadAddon(fit);
+      term.open(document.getElementById("terminal"));
+      fit.fit();
+
+      const statusEl = document.getElementById("status");
+      const wsScheme = location.protocol === "https:" ? "wss" : "ws";
+      const ws = new WebSocket(`${wsScheme}://${location.host}/ws`);
+      ws.binaryType = "arraybuffer";
+      const decoder = new TextDecoder();
+
+      function sendResize() {
+        if (ws.readyState !== WebSocket.OPEN) return;
+        ws.send(
+          JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows })
+        );
+      }
+
+      ws.onopen = () => {
+        statusEl.textContent = "verbunden";
+        statusEl.className = "";
+        fit.fit();
+        sendResize();
+        term.focus();
+      };
+
+      ws.onmessage = (event) => {
+        if (event.data instanceof ArrayBuffer) {
+          term.write(new Uint8Array(event.data));
+        } else {
+          term.write(String(event.data));
+        }
+      };
+
+      ws.onclose = () => {
+        statusEl.textContent = "getrennt";
+        statusEl.className = "disconnected";
+        term.write(
+          "\r\n\x1b[90m— Verbindung beendet. Seite neu laden, um erneut zu starten. —\x1b[0m\r\n"
+        );
+      };
+
+      ws.onerror = () => {
+        statusEl.textContent = "Verbindungsfehler";
+        statusEl.className = "disconnected";
+      };
+
+      term.onData((data) => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "stdin", data }));
+        }
+      });
+
+      let resizeTimer = null;
+      window.addEventListener("resize", () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+          fit.fit();
+          sendResize();
+        }, 120);
+      });
+    </script>
+  </body>
+</html>

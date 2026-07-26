@@ -1,0 +1,19 @@
+# Reverse-Proxy mit automatischem HTTPS.
+#
+# {$SITE_ADDRESS} kommt aus der Umgebung (docker-compose):
+#   - eine Domain wie "coach.deine-domain.de"  -> Caddy holt automatisch ein
+#     Let's-Encrypt-Zertifikat (Ports 80/443 müssen offen und die DNS-A-Records
+#     auf die VPS-IP gesetzt sein).
+#   - ":80"                                     -> nur HTTP, für lokalen Test.
+
+{$SITE_ADDRESS} {
+	encode zstd gzip
+
+	# WebSocket (/ws) und HTTP an die App weiterreichen.
+	reverse_proxy app:8000
+
+	log {
+		output stdout
+		format console
+	}
+}
