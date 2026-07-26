@@ -3,9 +3,9 @@
 Ein interaktives Python-Tool, das konkrete berufliche Erfahrungen in ein validiertes Arbeitsstil-Profil und anschließend in authentische Bewerbungsantworten überführt.
 
 ```text
-╭───╮
+╭─────╮
 │◕‿◕│
-╰─┬─╯
+╰──┬──╯
 
 KI Bewerbungs Coach
 
