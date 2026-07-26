@@ -3,9 +3,9 @@
 Ein interaktives Python-Tool, das konkrete berufliche Erfahrungen in ein validiertes Arbeitsstil-Profil und anschließend in authentische Bewerbungsantworten überführt.
 
 ```text
-╭─────╮
+╭───╮
 │◕‿◕│
-╰──┬──╯
+╰─┬─╯
 
 KI Bewerbungs Coach
 
@@ -16,16 +16,26 @@ gleichen sie mit der Zielrolle ab und entwickeln daraus
 einen Bewerbungstext, den du selbst prüfen und freigeben kannst.
 ```
 
-Der Coach schreibt nicht sofort einen möglichst überzeugenden Text. Er fragt zunächst nach konkreten Situationen, verdichtet die Antworten zu einer überprüfbaren Arbeitshypothese und gibt der Person anschließend die Möglichkeit, diese Interpretation zu korrigieren. Erst danach werden Bewerbungsantworten formuliert und kritisch gegengelesen.
+Der Coach schreibt nicht sofort einen möglichst überzeugenden Text. Er fragt zunächst nach konkreten Situationen, verdichtet die Antworten zu einer überprüfbaren Arbeitshypothese und einer Belegbank konkreter Ankersituationen. Die Person korrigiert Profil, Beispiele und sprachliche Anker, bevor Bewerbungsantworten formuliert und auf Austauschbarkeit geprüft werden.
 
 > Das Tool ist kein psychologisches Diagnoseinstrument. Die finale inhaltliche Verantwortung und Freigabe liegen immer bei der Person.
+
+## Was „persönlich“ hier bedeutet
+
+Der Coach erzeugt keine künstliche Persona. Persönliche Kontur entsteht aus drei Quellen:
+
+- **Ankersituationen:** Ausgangslage, eigener Beitrag, Schwierigkeit und Erkenntnis,
+- **sprachliche Anker:** charakteristische Formulierungen und gewünschte Direktheit,
+- **Austauschbarkeitstest:** allgemeine Aussagen werden mit Belegen verbunden oder vorsichtiger formuliert.
+
+Mindestens drei der fünf finalen Antworten sollen eine konkrete Situation, Entscheidung oder Beobachtung sichtbar machen.
 
 ## Ablauf
 
 ```mermaid
 flowchart LR
     A[1 · Kontext] --> B[2 · Reflexionsinterview]
-    B --> C[3 · Profilentwurf]
+    B --> C[3 · Profil und Belegbank]
     C --> D[4 · Eigene Korrektur]
     D --> E[5 · Optionaler Unterlagenabgleich]
     E --> F[6 · Entwurf und kritisches Review]
@@ -35,11 +45,11 @@ flowchart LR
 | Schritt | Ergebnis |
 |---|---|
 | **1 · Kontext** | Aktuelle Rolle, Zielrolle und optional die Stellenausschreibung |
-| **2 · Reflexionsinterview** | Konkrete Erfahrungen statt abstrakter Eigenschaftslisten |
-| **3 · Profilentwurf** | Arbeitsstil, Zusammenarbeit, Motivation, Stärken und Spannungsfelder |
-| **4 · Eigene Korrektur** | Die Person bestätigt, ergänzt oder korrigiert die Interpretation |
+| **2 · Reflexionsinterview** | Mindestens drei Ankersituationen mit eigenem Beitrag und Erkenntnis |
+| **3 · Profil und Belegbank** | Arbeitsstil, konkrete Situationen und charakteristische Formulierungen |
+| **4 · Eigene Korrektur** | Die Person bestätigt Profil, Belege und verwendbare sprachliche Anker |
 | **5 · Optionaler Unterlagenabgleich** | Vergleich mit CV oder Anschreiben sowie der Zielrolle |
-| **6 · Finale Antworten** | Erster Entwurf, kritisches Review und überarbeitete Fassung |
+| **6 · Finale Antworten** | Mindestens drei konkret verankerte Antworten plus Austauschbarkeitstest |
 
 ## Reifegrad
 
@@ -76,6 +86,7 @@ ki-bewerbungs-coach/
 ├── tests/
 │   ├── test_llm_response_parsing.py
 │   ├── test_output.py
+│   ├── test_personal_evidence.py
 │   └── test_workflow_helpers.py
 ├── docs/
 │   └── konzept.md
@@ -107,6 +118,20 @@ Die Aufteilung soll Verantwortlichkeiten sichtbar machen, ohne für einen kleine
 
 ## Installation
 
+### Installation mit uv
+
+```bash
+uv sync --extra dev
+```
+
+Start ohne Aktivierung der virtuellen Umgebung:
+
+```bash
+uv run ki-bewerbungs-coach
+```
+
+### Klassische virtuelle Umgebung
+
 ```bash
 git clone <repository-url>
 cd <repository-verzeichnis>
@@ -136,7 +161,7 @@ cp .env.example .env
 Beispiel für Anthropic:
 
 ```dotenv
-MODEL=claude-sonnet-4-6
+MODEL=claude-sonnet-5
 ANTHROPIC_API_KEY=dein_api_key
 MAX_QUESTIONS=12
 OUTPUT_FILE=bewerbung_output.md

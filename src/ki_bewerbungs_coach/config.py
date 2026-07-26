@@ -24,7 +24,7 @@ class Settings:
         """Lädt lokale Konfiguration, ohne bestehende Prozessvariablen unbeabsichtigt zu überschreiben."""
         load_local_environment(base_dir)
         return cls(
-            model=os.getenv("MODEL", "claude-sonnet-4-6"),
+            model=os.getenv("MODEL", "claude-sonnet-5"),
             max_questions=max(1, _read_int("MAX_QUESTIONS", 12)),
             output_file=Path(os.getenv("OUTPUT_FILE", "bewerbung_output.md")),
             empty_retries=max(0, _read_int("LLM_EMPTY_RETRIES", 1)),

@@ -13,6 +13,7 @@ from .prompts import (
     SYNTHESIS_PROMPT,
     WRITER_PROMPT,
     build_interviewer_prompt,
+    MIN_ANCHOR_SITUATIONS,
 )
 from .ui import TerminalUI
 
@@ -31,10 +32,13 @@ class CoachWorkflow:
     def run(self) -> CoachResult:
         context, job_text = self.phase_context()
         interview = self.phase_interview(context, job_text)
-        profile = self.phase_synthesis(interview)
-        profile = self.phase_reflection(profile)
+        transcript = build_transcript(interview)
+        profile = self.phase_synthesis(transcript)
+        profile = self.phase_reflection(profile, transcript)
         gap_analysis, job_text = self.phase_sharpening(profile, job_text)
-        draft, final_review = self.phase_write(profile, gap_analysis, job_text)
+        draft, final_review = self.phase_write(
+            profile, gap_analysis, job_text, transcript
+        )
         return CoachResult(profile, gap_analysis, draft, final_review)
 
     def phase_context(self) -> tuple[str, str]:
@@ -99,7 +103,7 @@ class CoachWorkflow:
         self.ui.show_notice(f"Interview abgeschlossen: {answered} Antwort(en) erfasst.")
         return messages
 
-    def phase_synthesis(self, interview: list[dict[str, str]]) -> str:
+    def phase_synthesis(self, transcript: str) -> str:
         """Das erste Profil bleibt eine überprüfbare Hypothese und wird nicht als Diagnose präsentiert."""
         self.ui.phase_header(3)
         self.ui.coach_say(
@@ -107,21 +111,22 @@ class CoachWorkflow:
             "Arbeitshypothese – du korrigierst ihn im nächsten Schritt.",
             face="thinking",
         )
-        transcript = build_transcript(interview)
         profile = self.llm.complete(
             SYNTHESIS_PROMPT,
             [],
             f"Interview-Transkript:\n\n{transcript}",
         )
-        self.ui.show_document("Arbeitsstil-Profil · Entwurf", profile)
+        self.ui.show_document("Arbeitsstil-Profil und Belegbank · Entwurf", profile)
+        self._show_anchor_notice(profile)
         return profile
 
-    def phase_reflection(self, profile: str) -> str:
+    def phase_reflection(self, profile: str, transcript: str) -> str:
         """Die Person korrigiert die Interpretation, bevor sie als Grundlage für Bewerbungsinhalte dient."""
         self.ui.phase_header(4)
         self.ui.coach_say(
-            "Jetzt hast du die Deutungshoheit: Was trifft zu, was ist falsch, was fehlt oder ist "
-            "zu stark formuliert? Mit **SKIP** übernimmst du den Entwurf unverändert.",
+            "Jetzt hast du die Deutungshoheit: Prüfe besonders die Ankersituationen und "
+            "sprachlichen Formulierungen. Was trifft zu, was fehlt, was soll anonymisiert oder "
+            "nicht verwendet werden? Mit **SKIP** übernimmst du den Entwurf unverändert.",
             face="curious",
         )
         feedback = self.ui.multiline_prompt("Dein Feedback zum Profil", optional=True)
@@ -132,10 +137,29 @@ class CoachWorkflow:
         refined = self.llm.complete(
             REFINEMENT_PROMPT,
             [],
-            f"Ursprüngliches Profil:\n\n{profile}\n\nFeedback der Person:\n\n{feedback}",
+            f"Interview-Transkript:\n\n{transcript}\n\n"
+            f"Ursprüngliches Profil mit Belegbank:\n\n{profile}\n\n"
+            f"Feedback der Person:\n\n{feedback}",
         )
-        self.ui.show_document("Arbeitsstil-Profil · validierte Fassung", refined)
+        self.ui.show_document("Arbeitsstil-Profil und Belegbank · validierte Fassung", refined)
+        self._show_anchor_notice(refined)
         return refined
+
+    def _show_anchor_notice(self, profile: str) -> None:
+        """Ein sichtbarer Belegcheck verhindert, dass ein glattes Profil unbemerkt ohne Beispiele bleibt."""
+        count = count_anchor_situations(profile)
+        if count >= MIN_ANCHOR_SITUATIONS:
+            self.ui.show_notice(
+                f"Belegbank: {count} Ankersituationen erkannt. Prüfe im nächsten Schritt, "
+                "ob sie korrekt, verständlich und verwendbar sind."
+            )
+            return
+
+        self.ui.show_notice(
+            f"Belegbank: nur {count} von empfohlenen {MIN_ANCHOR_SITUATIONS} "
+            "Ankersituationen erkannt. Ergänze im Feedback möglichst eine weitere konkrete "
+            "Situation mit eigenem Beitrag und Erkenntnis."
+        )
 
     def phase_sharpening(self, profile: str, job_text: str = "") -> tuple[str, str]:
         """Der optionale Abgleich sucht Lücken und Widersprüche statt künstlicher Stellenpassung."""
@@ -167,16 +191,21 @@ class CoachWorkflow:
         profile: str,
         gap_analysis: str,
         job_text: str,
+        transcript: str,
     ) -> tuple[str, str]:
         """Ein getrennter Review verhindert, dass sprachliche Glätte als Faktentreue missverstanden wird."""
         self.ui.phase_header(6)
         self.ui.coach_say(
-            "Aus deinem validierten Profil entstehen jetzt die fünf Antworten. Anschließend prüfe "
-            "ich sie noch einmal auf Übertreibungen, unbelegte Aussagen und unnötige Floskeln.",
+            "Aus deinem validierten Profil und den Ankersituationen entstehen jetzt die fünf "
+            "Antworten. Anschließend prüfe ich, ob konkrete Erfahrungen sichtbar bleiben und der "
+            "Text wirklich nach dir klingt.",
             face="thinking",
         )
 
-        context = f"Validiertes Arbeitsstil-Profil:\n\n{profile}"
+        context = (
+            f"Validiertes Arbeitsstil-Profil mit Belegbank:\n\n{profile}"
+            f"\n\nInterview-Transkript als zusätzliche Evidenz:\n\n{transcript}"
+        )
         if gap_analysis:
             context += f"\n\nGap-Analyse:\n\n{gap_analysis}"
         if job_text:
@@ -185,7 +214,11 @@ class CoachWorkflow:
         draft = self.llm.complete(WRITER_PROMPT, [], context)
         self.ui.show_document("Antworten · erster Entwurf", draft)
 
-        review_context = f"Bewerbungstext:\n\n{draft}\n\nValidiertes Profil:\n\n{profile}"
+        review_context = (
+            f"Bewerbungstext:\n\n{draft}\n\n"
+            f"Validiertes Profil mit Belegbank:\n\n{profile}\n\n"
+            f"Interview-Transkript als Evidenz:\n\n{transcript}"
+        )
         if job_text:
             review_context += f"\n\nStellenbeschreibung:\n\n{job_text}"
 
@@ -233,3 +266,10 @@ def build_transcript(messages: list[dict[str, str]]) -> str:
         f"{labels.get(item['role'], item['role'])}: {item['content']}"
         for item in messages
     )
+
+
+def count_anchor_situations(markdown: str) -> int:
+    """Die stabile Überschrift macht die Belegbank ohne ein starres JSON-Format grob prüfbar."""
+    import re
+
+    return len(re.findall(r"(?mi)^###\s+Situation\s+\d+\b", markdown))
