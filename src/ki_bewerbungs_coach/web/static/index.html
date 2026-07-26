@@ -169,7 +169,7 @@
         <textarea
           id="input"
           rows="1"
-          placeholder="Antwort eingeben … (mehrzeilig möglich, dann „Senden“)"
+          placeholder="Antwort eingeben und Enter … (Umschalt+Enter = neue Zeile)"
           autocapitalize="sentences"
         ></textarea>
         <button type="submit" id="send">Senden</button>
@@ -189,10 +189,14 @@
 
       function startTerminal() {
         const term = new Terminal({
-          cursorBlink: true,
+          // Das Terminal ist reine Anzeige – Eingabe läuft über das Antwortfeld.
+          // Deshalb Eingabe deaktivieren und den Cursor ausblenden.
+          disableStdin: true,
+          cursorBlink: false,
+          cursorInactiveStyle: "none",
           fontSize: isMobile ? 12 : 14,
           fontFamily: FONT_FAMILY,
-          theme: { background: "#000000", foreground: "#e2e8f0" },
+          theme: { background: "#000000", foreground: "#e2e8f0", cursor: "#000000" },
           convertEol: false,
           scrollback: 5000,
         });
@@ -249,10 +253,7 @@
           statusEl.className = "disconnected";
         };
 
-        // Desktop: direkt im Terminal tippen bleibt möglich.
-        term.onData((data) => sendStdin(data));
-
-        // --- Eingabeleiste (mobil-tauglich) --------------------------------
+        // --- Eingabeleiste (einzige Eingabequelle) -------------------------
         function submitInput() {
           const text = inputEl.value;
           if (text.trim() === "" && text.indexOf("\n") === -1) {
@@ -272,10 +273,11 @@
           submitInput();
         });
 
-        // Ctrl/Cmd+Enter sendet ebenfalls; Enter allein erzeugt eine neue Zeile
-        // (wichtig, damit man vor „DONE“ noch Zeilen einfügen kann).
+        // Enter sendet; Umschalt+Enter erzeugt eine neue Zeile (z. B. um vor
+        // „DONE“ noch Zeilen einzufügen). Für die Steuertoken gibt es zusätzlich
+        // die Schnell-Buttons.
         inputEl.addEventListener("keydown", (e) => {
-          if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+          if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
             submitInput();
           }

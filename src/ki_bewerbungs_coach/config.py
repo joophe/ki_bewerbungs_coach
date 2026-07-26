@@ -18,6 +18,7 @@ class Settings:
     output_file: Path
     empty_retries: int
     retry_delay_seconds: float
+    timeout_seconds: float
 
     @classmethod
     def from_environment(cls, base_dir: Path | None = None) -> "Settings":
@@ -29,6 +30,9 @@ class Settings:
             output_file=Path(os.getenv("OUTPUT_FILE", "bewerbung_output.md")),
             empty_retries=max(0, _read_int("LLM_EMPTY_RETRIES", 1)),
             retry_delay_seconds=max(0.0, _read_float("LLM_RETRY_DELAY_SECONDS", 1.0)),
+            # Begrenzt die Wartezeit pro Modellaufruf, damit ein träges/hängendes
+            # (z. B. kostenloses) Modell den Coach nicht endlos blockiert.
+            timeout_seconds=max(5.0, _read_float("LLM_TIMEOUT_SECONDS", 90.0)),
         )
 
 

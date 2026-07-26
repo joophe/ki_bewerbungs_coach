@@ -19,6 +19,26 @@ try:
 except ImportError:  # pragma: no cover
     OpenAI = None
 
+
+def _collect_timeout_error_types() -> tuple[type[BaseException], ...]:
+    """Sammelt die Timeout-/Verbindungsfehler der verfügbaren SDKs.
+
+    So können träge oder hängende Modellaufrufe wie eine leere Antwort behandelt
+    werden und lösen den bestehenden Fallback aus, statt den Coach zu blockieren.
+    """
+    types: list[type[BaseException]] = []
+    for module in (anthropic, __import__("openai") if OpenAI is not None else None):
+        if module is None:
+            continue
+        for name in ("APITimeoutError", "APIConnectionError"):
+            candidate = getattr(module, name, None)
+            if isinstance(candidate, type) and issubclass(candidate, BaseException):
+                types.append(candidate)
+    return tuple(types)
+
+
+TIMEOUT_ERROR_TYPES = _collect_timeout_error_types()
+
 RetryCallback = Callable[[str], None]
 StatusFactory = Callable[[str], Any]
 
@@ -103,11 +123,19 @@ class LLMService:
                     }
                 )
 
-            if self.status_factory:
-                with self.status_factory("Der KI Bewerbungs Coach denkt nach …"):
+            try:
+                if self.status_factory:
+                    with self.status_factory("Der KI Bewerbungs Coach denkt nach …"):
+                        answer, last_diagnostic = self._request(system, payload_messages)
+                else:
                     answer, last_diagnostic = self._request(system, payload_messages)
-            else:
-                answer, last_diagnostic = self._request(system, payload_messages)
+            except TIMEOUT_ERROR_TYPES as exc:
+                # Zeitüberschreitung/Verbindungsabbruch wie eine leere Antwort behandeln:
+                # der Coach wiederholt begrenzt und greift danach auf seinen Fallback zurück.
+                answer, last_diagnostic = "", (
+                    f"Zeitüberschreitung/Verbindungsfehler nach ~"
+                    f"{self.settings.timeout_seconds:.0f}s: {exc}"
+                )
 
             if answer:
                 messages.append({"role": "assistant", "content": answer})
@@ -133,6 +161,15 @@ class LLMService:
             return self._request_anthropic(system, messages)
         return self._request_openai_compatible(system, messages)
 
+    def _client_kwargs(self) -> dict[str, Any]:
+        """Gemeinsame Client-Optionen: hartes Timeout, keine SDK-internen Retries.
+
+        Der Coach hat eine eigene, begrenzte Wiederholungslogik. Würde das SDK
+        zusätzlich wiederholen, käme das Timeout mehrfach zum Tragen und die
+        Wartezeit könnte sich vervielfachen.
+        """
+        return {"timeout": self.settings.timeout_seconds, "max_retries": 0}
+
     def _request_anthropic(
         self,
         system: str,
@@ -140,7 +177,9 @@ class LLMService:
     ) -> tuple[str, str]:
         assert anthropic is not None
         if self._client is None:
-            self._client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+            self._client = anthropic.Anthropic(
+                api_key=os.getenv("ANTHROPIC_API_KEY"), **self._client_kwargs()
+            )
 
         payload = messages or [{"role": "user", "content": "Bitte beginne."}]
         response = self._client.messages.create(
@@ -180,12 +219,13 @@ class LLMService:
 
         if model.startswith("ollama/"):
             base_url = os.getenv("OLLAMA_API_BASE", "http://localhost:11434/v1")
-            self._client = OpenAI(base_url=base_url, api_key="ollama")
+            self._client = OpenAI(base_url=base_url, api_key="ollama", **self._client_kwargs())
             self._model_name = model.split("/", 1)[1]
         elif model.startswith("gemini/"):
             self._client = OpenAI(
                 base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
                 api_key=os.getenv("GEMINI_API_KEY"),
+                **self._client_kwargs(),
             )
             self._model_name = model.split("/", 1)[1]
         elif model.startswith("azure/"):
@@ -195,12 +235,14 @@ class LLMService:
                 api_key=os.getenv("AZURE_OPENAI_API_KEY"),
                 azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
                 api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-01"),
+                **self._client_kwargs(),
             )
             self._model_name = model.split("/", 1)[1]
         else:
             self._client = OpenAI(
                 base_url=os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1"),
                 api_key=os.getenv("OPENAI_API_KEY"),
+                **self._client_kwargs(),
             )
             self._model_name = model
 
