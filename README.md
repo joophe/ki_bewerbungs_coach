@@ -167,9 +167,15 @@ MAX_QUESTIONS=12
 OUTPUT_FILE=bewerbung_output.md
 LLM_EMPTY_RETRIES=1
 LLM_RETRY_DELAY_SECONDS=1.0
+LLM_TIMEOUT_SECONDS=90
 ```
 
 Weitere Beispiele für OpenAI-kompatible Provider, Ollama, Gemini und Azure OpenAI stehen in `.env.example`.
+
+`LLM_TIMEOUT_SECONDS` begrenzt die Wartezeit pro Modellaufruf, damit ein träges
+oder hängendes Modell den Coach nicht blockiert. Die Web-Version setzt zusätzlich
+`WRITE_OUTPUT_FILE=0`, da die Antworten dort im Terminal-Verlauf stehen und keine
+Ergebnisdatei nötig ist (siehe `.env.example` und [DEPLOY.md](DEPLOY.md)).
 
 Die `.env`-Datei darf nicht in Git eingecheckt werden.
 
