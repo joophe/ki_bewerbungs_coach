@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 from contextlib import AbstractContextManager
 
@@ -16,12 +17,31 @@ from rich.theme import Theme
 
 from .config import Settings
 
-# Farben sind für einen dunklen Terminalhintergrund abgestimmt (Web-Demo & übliche Terminals).
-BRAND_BLUE = "#5B9BFF"
-ACCENT_GOLD = "#F4B400"
-ALERT_RED = "#FF6B6B"
-TEXT_INK = "#E5E7EB"
-TEXT_MUTED = "#9CA3AF"
+# Zwei Farbpaletten, damit derselbe Code auf dunklen Terminals (CLI) und auf dem
+# hellen, freundlichen Hintergrund der Web-Demo lesbar bleibt. Die Web-Version
+# setzt COACH_THEME=light; die CLI bleibt standardmäßig dunkel.
+_DARK_PALETTE = {
+    "brand_blue": "#5B9BFF",
+    "accent_gold": "#F4B400",
+    "alert_red": "#FF6B6B",
+    "ink": "#E5E7EB",
+    "muted": "#9CA3AF",
+}
+_LIGHT_PALETTE = {
+    "brand_blue": "#1A56DB",   # kräftiges Blau, gut lesbar auf Hell
+    "accent_gold": "#B45309",  # tiefes Amber statt hellem Gold (Kontrast auf Hell)
+    "alert_red": "#C5221F",
+    "ink": "#1F2937",
+    "muted": "#6B7280",
+}
+
+_PALETTE = _LIGHT_PALETTE if os.getenv("COACH_THEME", "dark").strip().lower() == "light" else _DARK_PALETTE
+
+BRAND_BLUE = _PALETTE["brand_blue"]
+ACCENT_GOLD = _PALETTE["accent_gold"]
+ALERT_RED = _PALETTE["alert_red"]
+TEXT_INK = _PALETTE["ink"]
+TEXT_MUTED = _PALETTE["muted"]
 
 THEME = Theme(
     {

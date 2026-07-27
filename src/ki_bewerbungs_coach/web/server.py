@@ -119,6 +119,8 @@ def _child_environment(session_dir: Path, rows: int, cols: int) -> dict[str, str
             "COLUMNS": str(cols),
             "LINES": str(rows),
             "PYTHONUNBUFFERED": "1",
+            # Helles, freundliches Farbschema passend zur hellen Web-Oberfläche.
+            "COACH_THEME": "light",
             # Keine Ergebnisdatei in der Web-Version: Antworten stehen im Verlauf,
             # die Sitzung ist ephemer.
             "WRITE_OUTPUT_FILE": "0",
