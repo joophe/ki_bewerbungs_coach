@@ -63,9 +63,24 @@ MAX_SESSION_SECONDS = max(60, _int_env("WEB_MAX_SESSION_SECONDS", 1800))
 DEFAULT_COLS = max(20, _int_env("WEB_DEFAULT_COLS", 100))
 DEFAULT_ROWS = max(10, _int_env("WEB_DEFAULT_ROWS", 32))
 
+# Pro-IP-Schutz: begrenzt gleichzeitige Sitzungen und Verbindungsrate einer
+# einzelnen Quelle, damit ein einzelner Bot/Client nicht alle globalen
+# WEB_MAX_SESSIONS-Plätze belegen oder den Server mit Connect-Versuchen fluten kann.
+MAX_SESSIONS_PER_IP = max(1, _int_env("WEB_MAX_SESSIONS_PER_IP", 2))
+RATE_LIMIT_WINDOW_SECONDS = max(1, _int_env("WEB_RATE_LIMIT_WINDOW_SECONDS", 60))
+RATE_LIMIT_MAX_CONNECTS = max(1, _int_env("WEB_RATE_LIMIT_MAX_CONNECTS", 10))
+
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
-app = FastAPI(title="KI Bewerbungs Coach – Web")
+app = FastAPI(
+    title="KI Bewerbungs Coach – Web",
+    # Keine öffentliche API-Dokumentation auf einem Produktiv-Deployment:
+    # /docs, /redoc und /openapi.json geben sonst die komplette Routen-
+    # struktur inkl. Feldnamen preis (siehe Bot-Scan-Auswertung).
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
+)
 
 # Statische Assets (u. a. der mitgelieferte Monospace-Font für ein
 # browserunabhängiges Rendering des Maskottchens).
@@ -79,6 +94,10 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 _active_sessions = 0
 _sessions_lock = asyncio.Lock()
 
+# Pro-IP-Zustand: aktive Sitzungen und Zeitstempel der letzten Verbindungsversuche.
+_sessions_by_ip: dict[str, int] = {}
+_connect_times_by_ip: dict[str, list[float]] = {}
+
 
 async def _acquire_slot() -> bool:
     global _active_sessions
@@ -89,10 +108,45 @@ async def _acquire_slot() -> bool:
         return True
 
 
-async def _release_slot() -> None:
+async def _release_slot(client_ip: str) -> None:
     global _active_sessions
     async with _sessions_lock:
         _active_sessions = max(0, _active_sessions - 1)
+        remaining = _sessions_by_ip.get(client_ip, 0) - 1
+        if remaining <= 0:
+            _sessions_by_ip.pop(client_ip, None)
+        else:
+            _sessions_by_ip[client_ip] = remaining
+
+
+def _client_ip(websocket: WebSocket) -> str:
+    """Ermittelt die Client-IP; hinter Caddy steht die echte IP in X-Forwarded-For."""
+    forwarded = websocket.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return websocket.client.host if websocket.client else "unknown"
+
+
+async def _acquire_ip_slot(client_ip: str) -> bool:
+    """Pro-IP-Concurrency- und Rate-Limit; verhindert, dass eine Quelle allein
+    alle globalen Plätze belegt oder den Server mit Connects flutet."""
+    now = time.monotonic()
+    async with _sessions_lock:
+        if _sessions_by_ip.get(client_ip, 0) >= MAX_SESSIONS_PER_IP:
+            return False
+
+        recent = [
+            t for t in _connect_times_by_ip.get(client_ip, [])
+            if now - t < RATE_LIMIT_WINDOW_SECONDS
+        ]
+        if len(recent) >= RATE_LIMIT_MAX_CONNECTS:
+            _connect_times_by_ip[client_ip] = recent
+            return False
+
+        recent.append(now)
+        _connect_times_by_ip[client_ip] = recent
+        _sessions_by_ip[client_ip] = _sessions_by_ip.get(client_ip, 0) + 1
+        return True
 
 
 # --------------------------------------------------------------------------- #
@@ -149,11 +203,25 @@ async def index() -> FileResponse:
 async def terminal_ws(websocket: WebSocket) -> None:
     await websocket.accept()
 
+    client_ip = _client_ip(websocket)
+
+    if not await _acquire_ip_slot(client_ip):
+        await websocket.send_bytes(
+            "\r\n  Zu viele Anfragen von dieser Adresse. "
+            "Bitte in einer Minute erneut versuchen.\r\n".encode("utf-8")
+        )
+        await websocket.close()
+        return
+
     if not await _acquire_slot():
         await websocket.send_bytes(
             "\r\n  Aktuell sind alle Demo-Plätze belegt. "
             "Bitte in ein paar Minuten erneut versuchen.\r\n".encode("utf-8")
         )
+        async with _sessions_lock:
+            _sessions_by_ip[client_ip] = max(0, _sessions_by_ip.get(client_ip, 1) - 1)
+            if _sessions_by_ip[client_ip] == 0:
+                del _sessions_by_ip[client_ip]
         await websocket.close()
         return
 
@@ -275,7 +343,7 @@ async def terminal_ws(websocket: WebSocket) -> None:
         except OSError:
             pass
         shutil.rmtree(session_dir, ignore_errors=True)
-        await _release_slot()
+        await _release_slot(client_ip)
         try:
             await websocket.close()
         except RuntimeError:

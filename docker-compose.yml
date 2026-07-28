@@ -17,9 +17,14 @@ services:
     # Ephemere Sitzungsverzeichnisse liegen unter /tmp.
     tmpfs:
       - /tmp
-    # Zusätzliche Härtung: keine neuen Privilegien.
+    # Zusätzliche Härtung: keine neuen Privilegien, unveränderliches
+    # Root-Dateisystem (einzig /tmp muss beschreibbar sein), keine Linux-
+    # Capabilities (die App braucht keine besonderen Rechte).
     security_opt:
       - no-new-privileges:true
+    read_only: true
+    cap_drop:
+      - ALL
 
   caddy:
     image: caddy:2
@@ -36,6 +41,17 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+    # Härtung: keine neuen Privilegien, alle Capabilities außer der einen,
+    # die zum Binden von Port 80/443 als root nötig ist (NET_BIND_SERVICE),
+    # entfernt. Restliche Schreibpfade laufen über die o.g. Volumes/tmpfs.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    tmpfs:
+      - /tmp
 
 volumes:
   caddy_data:
